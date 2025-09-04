@@ -14,22 +14,162 @@ const selectcite = {
 
     try {
       // Clean up the search keyword
-      const cleanKeyword = keyword.trim().replace(/\s+/g, ' ');
+      const cleanKeyword = keyword.trim().replace(/\s+/g, '+');
       
-      // Open Google Scholar search with the selected text
-      await this.openScholarSearch(cleanKeyword);
+      // First, search for the paper on Google Scholar
+      const searchUrl = `https://scholar.google.com/scholar?oi=gsb95&output=gsb&hl=en&q=${encodeURIComponent(cleanKeyword)}`;
       
-      // Show helpful notification to user
+      console.log('Searching:', searchUrl);
+      const searchResponse = await fetch(searchUrl);
+      
+      if (!searchResponse.ok) {
+        throw new Error('Search request failed');
+      }
+      
+      const searchText = await searchResponse.text();
+      
+      // Try to parse the response and extract paper ID
+      const paperId = this.extractPaperIdFromResponse(searchText);
+      
+      if (paperId) {
+        // Get the citation page for this paper
+        await this.getBibTexFromPaperId(paperId);
+      } else {
+        // Fallback: open search results page for manual selection
+        console.warn("Could not extract paper ID, falling back to manual search");
+        await this.openScholarSearch(cleanKeyword);
+        
+        chrome.notifications?.create({
+          type: 'basic',
+          iconUrl: 'icons/icon32.png',
+          title: 'SelectCite',
+          message: `Found search results for: "${keyword}"\nPlease click "Cite" then "BibTeX" manually.`
+        });
+      }
+
+    } catch (error) {
+      console.error('Error in searchForBibTex:', error);
+      // Fallback to manual search
+      await this.openScholarSearch(keyword.trim().replace(/\s+/g, '+'));
+      this.showErrorNotification();
+    }
+  },
+
+  /**
+   * Extract paper ID from Google Scholar search response
+   * @param {string} responseText - HTML response from Scholar search
+   * @returns {string|null} Paper ID or null if not found
+   */
+  extractPaperIdFromResponse(responseText) {
+    try {
+      // Try multiple patterns to extract paper ID
+      const patterns = [
+        // Original pattern
+        /window\.googleSearchResponse\s*=\s*({.*?});/,
+        // Alternative patterns for different Scholar formats
+        /"r":\s*\[({.*?})\]/,
+        /data-clk="([^"]*)"/,
+        /data-href="\/scholar\?q=info:([^:]+):scholar\.google\.com/
+      ];
+      
+      for (const pattern of patterns) {
+        const match = responseText.match(pattern);
+        if (match) {
+          console.log('Found potential match:', match[1]);
+          
+          if (pattern === patterns[0]) {
+            // Parse JSON response
+            const searchData = JSON.parse(match[1]);
+            if (searchData.r && searchData.r.length > 0 && searchData.r[0].l && searchData.r[0].l.f && searchData.r[0].l.f.u) {
+              return searchData.r[0].l.f.u.replace('#f', '');
+            }
+          } else if (pattern === patterns[3]) {
+            // Direct paper ID extraction
+            return match[1];
+          }
+        }
+      }
+      
+      // Try to find any cite link
+      const citeMatch = responseText.match(/\/scholar\?q=info:([^:]+):scholar\.google\.com/);
+      if (citeMatch) {
+        return citeMatch[1];
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error extracting paper ID:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Get BibTeX citation from paper ID
+   * @param {string} paperId - Google Scholar paper ID
+   */
+  async getBibTexFromPaperId(paperId) {
+    try {
+      const citeUrl = `https://scholar.google.com/scholar?output=gsb-cite&hl=en&q=info:${paperId}:scholar.google.com/`;
+      console.log('Getting citations from:', citeUrl);
+      
+      const citeResponse = await fetch(citeUrl);
+      if (!citeResponse.ok) {
+        throw new Error('Citation request failed');
+      }
+      
+      const citeText = await citeResponse.text();
+      
+      // Try to parse citation response
+      try {
+        const citeData = JSON.parse(citeText);
+        if (citeData && citeData.i && citeData.i[0] && citeData.i[0].l === "BibTeX") {
+          const bibTexUrl = citeData.i[0].u;
+          console.log('Found BibTeX URL:', bibTexUrl);
+          
+          // Open the BibTeX page directly
+          await chrome.tabs.create({ url: bibTexUrl });
+          
+          chrome.notifications?.create({
+            type: 'basic',
+            iconUrl: 'icons/icon32.png',
+            title: 'SelectCite Success!',
+            message: 'BibTeX citation page opened! Copy the citation from the new tab.'
+          });
+          
+          return;
+        }
+      } catch (parseError) {
+        // If JSON parsing fails, try HTML parsing
+        const bibTexMatch = citeText.match(/href="([^"]*)"[^>]*>BibTeX<\/a>/);
+        if (bibTexMatch) {
+          const bibTexUrl = bibTexMatch[1];
+          console.log('Found BibTeX URL via HTML parsing:', bibTexUrl);
+          
+          await chrome.tabs.create({ url: bibTexUrl });
+          
+          chrome.notifications?.create({
+            type: 'basic',
+            iconUrl: 'icons/icon32.png',
+            title: 'SelectCite Success!',
+            message: 'BibTeX citation page opened! Copy the citation from the new tab.'
+          });
+          
+          return;
+        }
+      }
+      
+      // If we can't find BibTeX link, open the citation page
+      await chrome.tabs.create({ url: citeUrl });
       chrome.notifications?.create({
         type: 'basic',
         iconUrl: 'icons/icon32.png',
         title: 'SelectCite',
-        message: `Searching for: "${cleanKeyword.length > 50 ? cleanKeyword.substring(0, 50) + '...' : cleanKeyword}"\nClick "Cite" then "BibTeX" for the paper you need.`
+        message: 'Citation page opened. Please click on "BibTeX" link.'
       });
-
+      
     } catch (error) {
-      console.error('Error in searchForBibTex:', error);
-      this.showErrorNotification();
+      console.error('Error getting BibTeX:', error);
+      throw error;
     }
   },
 
