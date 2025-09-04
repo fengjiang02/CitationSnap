@@ -1,8 +1,7 @@
 {
-  "manifest_version": 2,
-
-  "name": "BibTex It!",
-  "description": "This extension gets your bibtex citation through your text selection within one-click. ",
+  "manifest_version": 3,
+  "name": "SelectCite",
+  "description": "Select text and get BibTeX citations instantly! Right-click any selected text to search for academic references.",
   "version": "1.0",
   "icons": {
     "16": "icons/icon16.png",
@@ -12,9 +11,15 @@
   "permissions": [
     "activeTab",
     "contextMenus",
-    "https://scholar.google.com/"
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://scholar.google.com/*"
   ],
   "background": {
-    "scripts": ["js/context.js"]
+    "service_worker": "js/background.js"
+  },
+  "action": {
+    "default_title": "SelectCite"
   }
 }

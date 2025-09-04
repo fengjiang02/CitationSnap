@@ -1,12 +1,21 @@
-# BibTex It! 
+# SelectCite
 
-BibTex It is a chrome extension that gets your bibtex citation ready through your text selection within one click.  
+📚 Get BibTeX citations for academic papers instantly! Select text, right-click to search.
 
-Web Store Link: https://chrome.google.com/webstore/detail/bibtex-it/hofkoiddldajhihgjbckeffpodeoockc
+## How to Use
 
-# Screenshots
+1. **Select text** on any webpage (paper title, author name, etc.)
+2. **Right-click** on the selected text
+3. Choose "**Search citation for [text]**"
+4. Google Scholar opens with search results
+5. Click "**Cite**" → "**BibTeX**" on the paper you need
 
-![ScreenShots_1](https://raw.githubusercontent.com/XericZephyr/BibTexIt/master/screenshots/screenshot_440_280.png)
+## Installation
 
-# Acknowledgement 
-The icons are fetched from http://www.flaticon.com/free-icon/mortarboard_123402 . We offer our sincere appreciation to the author. 
+1. Download all files to a folder
+2. Open Chrome browser, go to `chrome://extensions/`
+3. Enable "**Developer mode**" in the top-right corner
+4. Click "**Load unpacked**"
+5. Select the folder containing the files
+
+## File Structure
